@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f5f0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="My Projects">
+  <title>My Projects</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f7f5f0; --card: #fffefa; --ink: #242923; --muted: #697168;
+      --line: #e4e3db; --green: #356c4a; --green-pale: #e7f0e7; --red: #a33b35;
+      --shadow: 0 5px 20px rgba(33, 43, 33, .055);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    .app { max-width: 720px; margin: 0 auto; padding: max(22px, env(safe-area-inset-top)) 18px max(28px, env(safe-area-inset-bottom)); }
+    header { display:flex; justify-content:space-between; align-items:center; gap:14px; margin: 8px 0 22px; }
+    .eyebrow { color: var(--green); font-size: .75rem; font-weight: 750; text-transform: uppercase; letter-spacing: .12em; margin-bottom: 5px; }
+    h1 { margin:0; font-size: clamp(1.8rem, 6vw, 2.35rem); letter-spacing:-.045em; }
+    .sub { color: var(--muted); margin: 8px 0 0; line-height:1.45; }
+    .btn { border:0; border-radius:14px; padding:12px 15px; font-weight:700; background:var(--green); color:white; min-height:46px; }
+    .btn.secondary { background:#eeeee7; color:var(--ink); }
+    .btn.ghost { background:transparent; color:var(--muted); padding:8px 10px; min-height:38px; }
+    .btn.danger { color:var(--red); background:#fae9e7; }
+    .top-action { flex-shrink:0; }
+    .summary { display:flex; align-items:center; justify-content:space-between; gap:12px; margin: 24px 2px 12px; }
+    .summary h2 { font-size:1.05rem; margin:0; }
+    .count { font-size:.85rem; color:var(--muted); }
+    .projects { display:grid; gap:12px; }
+    .project-card { background:var(--card); border:1px solid var(--line); border-radius:20px; padding:17px; box-shadow:var(--shadow); }
+    .card-top { display:flex; align-items:flex-start; gap:12px; }
+    .project-mark { width:44px; height:44px; border-radius:14px; display:grid; place-items:center; background:var(--green-pale); font-size:1.35rem; flex-shrink:0; }
+    .project-main { flex:1; min-width:0; }
+    .project-title { margin:1px 0 5px; font-size:1.08rem; line-height:1.3; overflow-wrap:anywhere; }
+    .project-meta { color:var(--muted); font-size:.85rem; }
+    .open-project { border:0; background:transparent; color:var(--muted); padding:8px 0 8px 8px; font-size:1.25rem; }
+    .progress-track { height:7px; background:#ecece5; border-radius:999px; overflow:hidden; margin-top:15px; }
+    .progress-fill { height:100%; background:var(--green); border-radius:999px; transition:width .18s ease; }
+    .empty { text-align:center; padding:36px 20px; background:var(--card); border:1px dashed #d4d6ca; border-radius:20px; }
+    .empty .emoji { font-size:2rem; margin-bottom:10px; }
+    .empty h3 { margin:0 0 8px; }
+    .empty p { color:var(--muted); line-height:1.5; margin:0 auto 18px; max-width:300px; }
+    .hidden { display:none !important; }
+    .view-heading { display:flex; align-items:flex-start; gap:10px; margin:10px 0 22px; }
+    .back { border:0; border-radius:12px; width:42px; height:42px; background:#eae9e1; font-size:1.3rem; flex-shrink:0; }
+    .view-heading h2 { margin:1px 0 5px; font-size:1.5rem; letter-spacing:-.035em; overflow-wrap:anywhere; }
+    .view-heading p { margin:0; color:var(--muted); font-size:.9rem; }
+    .section-label { margin:22px 2px 10px; font-weight:750; font-size:.95rem; }
+    .task-list { display:grid; gap:8px; }
+    .task { display:flex; align-items:center; gap:12px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:13px; }
+    .task input { width:22px; height:22px; accent-color:var(--green); flex-shrink:0; }
+    .task-text { flex:1; line-height:1.35; overflow-wrap:anywhere; }
+    .task.done .task-text { color:var(--muted); text-decoration:line-through; }
+    .task-delete { border:0; background:transparent; color:#858a80; padding:5px; font-size:1.2rem; }
+    .add-task { display:flex; gap:8px; margin-top:12px; }
+    .field { width:100%; min-width:0; padding:13px 14px; border:1px solid #d9dbd1; border-radius:13px; background:white; color:var(--ink); outline:none; }
+    .field:focus { border-color:var(--green); box-shadow:0 0 0 3px #356c4a1b; }
+    textarea.field { min-height:84px; resize:vertical; }
+    .form-card { background:var(--card); border:1px solid var(--line); border-radius:20px; padding:18px; }
+    .form-card label { display:block; font-size:.9rem; font-weight:700; margin:0 0 7px; }
+    .form-row { margin-bottom:16px; }
+    .form-actions { display:flex; gap:9px; flex-wrap:wrap; margin-top:20px; }
+    .detail-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:22px; }
+    .note { color:var(--muted); font-size:.8rem; line-height:1.45; margin:20px 2px 0; }
+    .toast { position:fixed; bottom:calc(18px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); background:#242923; color:white; padding:11px 16px; border-radius:999px; font-size:.9rem; box-shadow:var(--shadow); z-index:10; }
+    @media (min-width:600px) { .projects { grid-template-columns:1fr 1fr; } .project-card { min-height:145px; } }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <div class="eyebrow">Small steps, finished projects</div>
+        <h1>My Projects</h1>
+        <p class="sub">A simple place to keep track of what you want to get done.</p>
+      </div>
+      <button id="newProjectBtn" class="btn top-action">+ New</button>
+    </header>
+
+    <section id="homeView">
+      <div class="summary"><h2>Your projects</h2><span id="projectCount" class="count"></span></div>
+      <div id="projects" class="projects"></div>
+      <p class="note">Your projects are saved on this device in this browser. No account needed.</p>
+    </section>
+
+    <section id="projectView" class="hidden">
+      <div class="view-heading">
+        <button id="backBtn" class="back" aria-label="Back to projects">←</button>
+        <div style="flex:1;min-width:0">
+          <div class="eyebrow">Project checklist</div>
+          <h2 id="detailTitle"></h2>
+          <p id="detailProgress"></p>
+        </div>
+      </div>
+      <div class="progress-track"><div id="detailProgressFill" class="progress-fill"></div></div>
+      <div class="section-label">Tasks</div>
+      <div id="taskList" class="task-list"></div>
+      <form id="addTaskForm" class="add-task">
+        <input id="taskInput" class="field" maxlength="180" placeholder="Add a task…" aria-label="New task" required>
+        <button class="btn" type="submit">Add</button>
+      </form>
+      <div class="section-label">Notes (optional)</div>
+      <textarea id="projectNotes" class="field" placeholder="Ideas, measurements, or anything to remember…"></textarea>
+      <div class="detail-actions">
+        <button id="renameBtn" class="btn secondary">Edit project</button>
+        <button id="deleteProjectBtn" class="btn ghost">Delete project</button>
+      </div>
+    </section>
+
+    <section id="formView" class="hidden">
+      <div class="view-heading">
+        <button id="formBackBtn" class="back" aria-label="Cancel and go back">←</button>
+        <div><div class="eyebrow">A project of your own</div><h2 id="formHeading">New project</h2><p>Keep it simple. You can add tasks as you go.</p></div>
+      </div>
+      <form id="projectForm" class="form-card">
+        <div class="form-row">
+          <label for="projectName">Project name</label>
+          <input id="projectName" class="field" maxlength="100" placeholder="e.g. Clear out the sitting room" required>
+        </div>
+        <div class="form-row">
+          <label for="firstTasks">First tasks (optional)</label>
+          <textarea id="firstTasks" class="field" placeholder="One task per line&#10;Gather rubbish bags&#10;Sort the books"></textarea>
+        </div>
+        <div class="form-actions">
+          <button class="btn" type="submit" id="saveProjectBtn">Create project</button>
+          <button class="btn secondary" type="button" id="cancelFormBtn">Cancel</button>
+        </div>
+      </form>
+    </section>
+    <div id="toast" class="toast hidden" role="status"></div>
+  </main>
+<script>
+(() => {
+  const STORAGE_KEY = 'simple-projects-v1';
+  let projects = loadProjects();
+  let currentId = null;
+  let editingId = null;
+  let toastTimer;
+
+  const $ = id => document.getElementById(id);
+  const views = { home: $('homeView'), project: $('projectView'), form: $('formView') };
+  function uid() { return (Date.now().toString(36) + Math.random().toString(36).slice(2, 8)); }
+  function loadProjects() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      return Array.isArray(parsed) ? parsed.filter(p => p && typeof p.id === 'string' && typeof p.name === 'string').map(p => ({
+        id:p.id, name:p.name, notes:typeof p.notes === 'string' ? p.notes : '',
+        createdAt:p.createdAt || new Date().toISOString(),
+        tasks:Array.isArray(p.tasks) ? p.tasks.filter(t => t && typeof t.text === 'string').map(t => ({id:t.id || uid(), text:t.text, done:!!t.done})) : []
+      })) : [];
+    } catch { return []; }
+  }
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(projects)); }
+    catch { showToast('Could not save. Check available device storage.'); }
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function completed(p) { return p.tasks.filter(t => t.done).length; }
+  function percent(p) { return p.tasks.length ? Math.round(completed(p) / p.tasks.length * 100) : 0; }
+  function showView(name) {
+    Object.entries(views).forEach(([key, el]) => el.classList.toggle('hidden', key !== name));
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+  function showToast(message) {
+    $('toast').textContent = message; $('toast').classList.remove('hidden');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.add('hidden'), 2200);
+  }
+  function renderHome() {
+    $('projectCount').textContent = `${projects.length} ${projects.length === 1 ? 'project' : 'projects'}`;
+    if (!projects.length) {
+      $('projects').innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="emoji">✓</div><h3>Start with one small project</h3><p>Choose something you want to get done, then break it into manageable tasks.</p><button class="btn" id="emptyNewBtn">Create your first project</button></div>`;
+      $('emptyNewBtn').addEventListener('click', () => openProjectForm());
+      return;
+    }
+    $('projects').innerHTML = projects.map(p => `
+      <article class="project-card">
+        <div class="card-top">
+          <div class="project-mark" aria-hidden="true">✓</div>
+          <div class="project-main">
+            <h3 class="project-title">${escapeHtml(p.name)}</h3>
+            <div class="project-meta">${completed(p)} of ${p.tasks.length} tasks complete${p.tasks.length ? ` · ${percent(p)}%` : ''}</div>
+          </div>
+          <button class="open-project" data-open="${p.id}" aria-label="Open ${escapeHtml(p.name)}">›</button>
+        </div>
+        <div class="progress-track"><div class="progress-fill" style="width:${percent(p)}%"></div></div>
+      </article>`).join('');
+    $('projects').querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => openProject(b.dataset.open)));
+    $('projects').querySelectorAll('.project-card').forEach((card, i) => card.addEventListener('click', e => {
+      if (!e.target.closest('button')) openProject(projects[i].id);
+    }));
+  }
+  function openProject(id) {
+    currentId = id; const p = projects.find(x => x.id === id); if (!p) return;
+    $('detailTitle').textContent = p.name;
+    renderTasks(); $('projectNotes').value = p.notes;
+    showView('project');
+  }
+  function renderTasks() {
+    const p = projects.find(x => x.id === currentId); if (!p) return;
+    $('detailTitle').textContent = p.name;
+    $('detailProgress').textContent = `${completed(p)} of ${p.tasks.length} tasks complete${p.tasks.length ? ` · ${percent(p)}% finished` : ' · Add your first task below'}`;
+    $('detailProgressFill').style.width = percent(p) + '%';
+    if (!p.tasks.length) {
+      $('taskList').innerHTML = '<div class="empty"><p style="margin:0">No tasks yet. Add the first step below.</p></div>';
+    } else {
+      $('taskList').innerHTML = p.tasks.map(t => `
+        <label class="task ${t.done ? 'done' : ''}">
+          <input type="checkbox" data-task="${t.id}" ${t.done ? 'checked' : ''} aria-label="Mark ${escapeHtml(t.text)} complete">
+          <span class="task-text">${escapeHtml(t.text)}</span>
+          <button type="button" class="task-delete" data-delete-task="${t.id}" aria-label="Delete task">×</button>
+        </label>`).join('');
+    }
+    $('taskList').querySelectorAll('[data-task]').forEach(cb => cb.addEventListener('change', () => {
+      const task = p.tasks.find(t => t.id === cb.dataset.task); if (task) { task.done = cb.checked; save(); renderTasks(); renderHome(); }
+    }));
+    $('taskList').querySelectorAll('[data-delete-task]').forEach(btn => btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      const task = p.tasks.find(t => t.id === btn.dataset.deleteTask);
+      if (task && confirm(`Delete task “${task.text}”?`)) { p.tasks = p.tasks.filter(t => t.id !== task.id); save(); renderTasks(); renderHome(); }
+    }));
+  }
+  function openProjectForm(id = null) {
+    editingId = id;
+    const p = id ? projects.find(x => x.id === id) : null;
+    $('formHeading').textContent = p ? 'Edit project' : 'New project';
+    $('saveProjectBtn').textContent = p ? 'Save changes' : 'Create project';
+    $('projectName').value = p ? p.name : '';
+    $('firstTasks').value = p ? p.tasks.map(t => t.text).join('\n') : '';
+    $('firstTasks').disabled = !!p;
+    showView('form'); $('projectName').focus();
+  }
+  function closeForm() {
+    if (currentId && projects.some(p => p.id === currentId)) openProject(currentId);
+    else { renderHome(); showView('home'); }
+  }
+  $('newProjectBtn').addEventListener('click', () => openProjectForm());
+  $('backBtn').addEventListener('click', () => { renderHome(); showView('home'); });
+  $('formBackBtn').addEventListener('click', closeForm);
+  $('cancelFormBtn').addEventListener('click', closeForm);
+  $('renameBtn').addEventListener('click', () => openProjectForm(currentId));
+  $('projectForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = $('projectName').value.trim(); if (!name) return;
+    if (editingId) {
+      const p = projects.find(x => x.id === editingId);
+      if (p) p.name = name;
+      save(); currentId = editingId; openProject(currentId); showToast('Project updated');
+    } else {
+      const tasks = $('firstTasks').value.split('\n').map(s => s.trim()).filter(Boolean).map(text => ({id:uid(), text, done:false}));
+      const p = {id:uid(), name, notes:'', createdAt:new Date().toISOString(), tasks};
+      projects.unshift(p); save(); currentId = p.id; openProject(p.id); showToast('Project created');
+    }
+    editingId = null; $('firstTasks').disabled = false; renderHome();
+  });
+  $('addTaskForm').addEventListener('submit', e => {
+    e.preventDefault(); const text = $('taskInput').value.trim(); if (!text) return;
+    const p = projects.find(x => x.id === currentId); if (!p) return;
+    p.tasks.push({id:uid(), text, done:false}); $('taskInput').value = ''; save(); renderTasks(); renderHome();
+  });
+  let notesTimer;
+  $('projectNotes').addEventListener('input', () => {
+    const p = projects.find(x => x.id === currentId); if (!p) return;
+    p.notes = $('projectNotes').value; save();
+  });
+  $('deleteProjectBtn').addEventListener('click', () => {
+    const p = projects.find(x => x.id === currentId); if (!p) return;
+    if (confirm(`Delete “${p.name}” and all its tasks? This cannot be undone.`)) {
+      projects = projects.filter(x => x.id !== currentId); currentId = null; save(); renderHome(); showView('home'); showToast('Project deleted');
+    }
+  });
+  window.addEventListener('storage', e => { if (e.key === STORAGE_KEY) { projects = loadProjects(); renderHome(); } });
+  renderHome();
+})();
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+  }
+</script>
+</body>
+</html>
