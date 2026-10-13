@@ -25,3 +25,11 @@ SECURITY
 
 NOTE
 This is an initial integration for testing. Keep a backup of your existing app and check the app carefully before publishing it to GitHub Pages.
+
+
+OFFLINE TEST BUILD
+- Data is saved to this browser's local storage immediately.
+- When online and signed in, the app attempts to merge cloud records and upload pending local changes.
+- This is an early offline-first test build. Keep the previous working ZIP as a backup.
+- Test creating/updating tasks offline, reconnecting, and checking Supabase before relying on this build.
+- Browser storage is per-device; cloud sync requires signing in and reconnecting to the internet.
