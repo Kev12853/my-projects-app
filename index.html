@@ -304,7 +304,26 @@
     // Explicit user deletions are queued locally and applied to the cloud only when online.
     // Never infer deletions from records missing in this device's local copy.
     const deletedTaskIds = readTombstones(DELETED_TASKS_KEY);
-    const deletedProjectIds = readTombstones(DELETED_PROJECTS_KEY);
+    const localDeletedProjectIds = readTombstones(DELETED_PROJECTS_KEY);
+
+    // Project deletion records live in Supabase so every browser origin/device
+    // sees them. A stale app must not resurrect a project from its local cache.
+    const { data: sharedProjectDeletions, error: sharedDeletionReadError } = await db
+      .from('project_deletion_tombstones')
+      .select('project_id')
+      .eq('user_id', userId);
+    if (sharedDeletionReadError) throw new Error('Project deletion protection is not configured. Run the supplied SQL in Supabase first. Details: ' + sharedDeletionReadError.message);
+    const sharedDeletedProjectIds = (sharedProjectDeletions || []).map(row => row.project_id);
+    const deletedProjectIds = [...new Set([...localDeletedProjectIds, ...sharedDeletedProjectIds])];
+
+    // Publish local deletion records before fetching/uploading project data.
+    if (localDeletedProjectIds.length) {
+      const deletionRows = localDeletedProjectIds.map(projectId => ({ user_id: userId, project_id: projectId }));
+      const { error: publishDeletionError } = await db.from('project_deletion_tombstones')
+        .upsert(deletionRows, { onConflict: 'user_id,project_id', ignoreDuplicates: true });
+      if (publishDeletionError) throw publishDeletionError;
+    }
+
     if (deletedTaskIds.length) {
       // Verify the requested deletions actually happened. PostgREST can return no error
       // when RLS/filtering means zero rows were affected, so an error-only check is not enough.
@@ -320,6 +339,11 @@
       }
     }
     if (deletedProjectIds.length) {
+      // Remove child tasks first, then the projects. The shared tombstones remain
+      // permanently, even after this device clears its local deletion queue.
+      const { error: deleteProjectTasksError } = await db.from('tasks').delete()
+        .eq('user_id', userId).in('project_id', deletedProjectIds);
+      if (deleteProjectTasksError) throw deleteProjectTasksError;
       const {data: existingProjects, error: existingProjectsError} = await db.from('projects').select('id').eq('user_id', userId).in('id', deletedProjectIds);
       if (existingProjectsError) throw existingProjectsError;
       const existingProjectIds = (existingProjects || []).map(row => row.id);
@@ -354,6 +378,9 @@
       projects = mergedProjects.map(p=>({...p,tasks:[]})); standaloneTasks=[];
       mergedTasks.forEach(t=>{ const pid=t.projectId || ''; delete t.projectId; if(pid){const p=projects.find(x=>x.id===pid); if(p)p.tasks.push(t);} else standaloneTasks.push(t); });
     }
+    // Final guard: never upload a project (or its tasks) whose ID is tombstoned.
+    const deletedProjectSetForUpload = new Set(deletedProjectIds);
+    projects = projects.filter(project => !deletedProjectSetForUpload.has(project.id));
     const {projectRows,taskRows} = cloudRows(userId);
     if (projectRows.length) { const {error}=await db.from('projects').upsert(projectRows,{onConflict:'id'}); if(error) throw error; }
     if (taskRows.length) { const {error}=await db.from('tasks').upsert(taskRows,{onConflict:'id'}); if(error) throw error; }
