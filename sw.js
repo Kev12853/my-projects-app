@@ -1,8 +1,9 @@
-
-const CACHE_NAME = 'my-projects-offline-v7';
+const CACHE_NAME = 'my-projects-offline-v9';
 const SHELL = [
   './',
   './index.html',
+  './styles.css',
+  './app.js',
   './config.js',
   './manifest.json',
   './icon-192.png',
@@ -17,7 +18,9 @@ self.addEventListener('install', event => {
       try {
         const response = await fetch(url, { cache: 'reload' });
         if (response.ok) await cache.put(url, response);
-      } catch (_) {}
+      } catch (_) {
+        // Keep installation possible when a shell resource is temporarily unavailable.
+      }
     }));
     await self.skipWaiting();
   })());
@@ -26,36 +29,27 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys
-      .filter(key =>
-        key.startsWith('my-projects-offline-') &&
-        key !== CACHE_NAME
-      )
-      .map(key => caches.delete(key)));
+    await Promise.all(keys.filter(key => key.startsWith('my-projects-offline-') && key !== CACHE_NAME).map(key => caches.delete(key)));
     await self.clients.claim();
   })());
 });
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-
   const url = new URL(event.request.url);
   if (url.protocol === 'chrome-extension:') return;
 
-  // Never cache Supabase API or authentication traffic.
+  // Keep Supabase API/auth traffic network-only. Never cache user data or auth responses.
   if (url.hostname.endsWith('.supabase.co')) return;
 
-  // Cache the Supabase JavaScript library for offline use.
+  // The Supabase JavaScript library can be served from cache when offline.
   if (url.hostname === 'cdn.jsdelivr.net') {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
       const cached = await cache.match(event.request);
       if (cached) return cached;
-
       const response = await fetch(event.request);
-      if (response.ok) {
-        await cache.put(event.request, response.clone());
-      }
+      if (response.ok) await cache.put(event.request, response.clone());
       return response;
     })());
     return;
@@ -63,21 +57,17 @@ self.addEventListener('fetch', event => {
 
   if (url.origin !== self.location.origin) return;
 
-  // Prefer current app files from the network; use cache offline.
+  // For app files, prefer the network so releases are picked up immediately;
+  // fall back to the cached copy when offline.
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
     try {
-      const response = await fetch(event.request, {
-        cache: 'no-store'
-      });
-      if (response.ok) {
-        await cache.put(event.request, response.clone());
-      }
+      const response = await fetch(event.request, { cache: 'no-store' });
+      if (response.ok) await cache.put(event.request, response.clone());
       return response;
     } catch (_) {
       const cached = await cache.match(event.request);
       if (cached) return cached;
-
       if (event.request.mode === 'navigate') {
         const appShell = await cache.match('./index.html');
         if (appShell) return appShell;
