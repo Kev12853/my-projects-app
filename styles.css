@@ -71,7 +71,7 @@
     .task.done .task-text { color:var(--muted); text-decoration:line-through; }
     .task-delete { border:0; background:transparent; color:#858a80; padding:5px; font-size:1.2rem; }
     .add-task { display:flex; gap:8px; margin-top:12px; }
-    .field { width:100%; min-width:0; padding:13px 14px; border:1px solid #d9dbd1; border-radius:13px; background:white; color:var(--ink); outline:none; }
+    .field { width:100%; min-width:0; padding:13px 14px; border:1px solid #d9dbd1; border-radius:13px; background:red; color:var(--ink); outline:none; }
     .field:focus { border-color:var(--green); box-shadow:0 0 0 3px #356c4a1b; }
     textarea.field { min-height:84px; resize:vertical; }
     .form-card { background:var(--card); border:1px solid var(--line); border-radius:20px; padding:18px; }
