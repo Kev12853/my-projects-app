@@ -33,3 +33,10 @@ OFFLINE TEST BUILD
 - This is an early offline-first test build. Keep the previous working ZIP as a backup.
 - Test creating/updating tasks offline, reconnecting, and checking Supabase before relying on this build.
 - Browser storage is per-device; cloud sync requires signing in and reconnecting to the internet.
+
+
+Authentication session persistence
+- Supabase Auth is configured to persist the session in this browser's local storage and refresh tokens automatically.
+- The app does not save the user's email password. Each device needs one successful sign-in.
+- After that, the saved session should restore automatically while valid; offline access uses the locally saved planner.
+- Signing out clears the app's local offline-access flag and signs out of Supabase when online.

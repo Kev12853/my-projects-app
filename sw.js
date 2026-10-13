@@ -1,4 +1,4 @@
-const CACHE_NAME = 'my-projects-offline-v3';
+const CACHE_NAME = 'my-projects-offline-v4';
 const SHELL = ['./', './index.html', './config.js', './manifest.json', './icon-192.png', './icon-512.png', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'];
 self.addEventListener('install', event => {
   event.waitUntil((async () => {

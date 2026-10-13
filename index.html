@@ -212,11 +212,20 @@
   const SUPABASE_URL = window.MY_PROJECTS_SUPABASE_URL || '';
   const SUPABASE_KEY = window.MY_PROJECTS_SUPABASE_KEY || '';
   const cloudReady = !!(window.supabase && SUPABASE_URL && SUPABASE_KEY);
-  const db = cloudReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+  const db = cloudReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: {
+      // Persist the signed-in session on this device; never store the user's password.
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: window.localStorage
+    }
+  }) : null;
   let session = null;
   let syncTimer = null;
   let isLoadingCloud = false;
   let pendingSync = localStorage.getItem('my-projects-pending-sync') === '1';
+  const LOCAL_ACCESS_KEY = 'my-projects-local-access-enabled';
   const DELETED_PROJECTS_KEY = 'my-projects-deleted-project-ids';
   const DELETED_TASKS_KEY = 'my-projects-deleted-task-ids';
   function readTombstones(key) { try { const v=JSON.parse(localStorage.getItem(key)||'[]'); return Array.isArray(v) ? [...new Set(v.filter(x=>typeof x==='string'))] : []; } catch { return []; } }
@@ -383,7 +392,7 @@
     if (result.error) { $('authStatus').textContent = result.error.message; return; }
     if (mode === 'signup' && !result.data.session) { $('authStatus').textContent = 'Account created. Check your email to confirm it, then sign in.'; return; }
     session = result.data.session;
-    if (session) { showSignedIn(); await loadCloudData(); }
+    if (session) { localStorage.setItem(LOCAL_ACCESS_KEY, '1'); showSignedIn(); await loadCloudData(); }
     else $('authStatus').textContent = 'Check your email if confirmation is required, then sign in.';
   }
   function formatDate(value) {
@@ -582,15 +591,35 @@
       projects = projects.filter(x => x.id !== currentId); currentId = null; save(); renderHome(); showView('home'); showToast('Project deleted');
     }
   });
-  window.addEventListener('online', () => { if (session && db) syncToCloud().catch(() => setSyncStatus('Sync pending — retrying when possible')); });
+  window.addEventListener('online', async () => {
+    if (!db) return;
+    try { const result = await db.auth.getSession(); if (result.error) throw result.error; session = result.data.session; if (session) await loadCloudData(); else setSyncStatus('Online — sign in to resume cloud sync'); }
+    catch (_) { setSyncStatus('Online — reconnecting to cloud…'); }
+  });
   window.addEventListener('offline', () => setSyncStatus('Offline — changes saved on this device'));
   document.addEventListener('visibilitychange', () => { if (!document.hidden && navigator.onLine && session && db && pendingSync) syncToCloud().catch(() => setSyncStatus('Sync pending — retrying when possible')); });
   window.addEventListener('storage', e => { if (e.key === STORAGE_KEY) { projects = loadProjects(); renderHome(); } });
   $('authForm').addEventListener('submit', e => { e.preventDefault(); handleAuth('signin').catch(err => $('authStatus').textContent = err.message); });
   $('signUpBtn').addEventListener('click', () => handleAuth('signup').catch(err => $('authStatus').textContent = err.message));
-  $('signOutBtn').addEventListener('click', async () => { if (db) await db.auth.signOut(); session=null; $('appRoot').classList.add('hidden'); $('authView').classList.remove('hidden'); $('authStatus').textContent='You have signed out.'; });
-  if (!cloudReady) $('authStatus').textContent = 'Set up config.js with your Supabase Project URL and publishable key to begin.';
-  else db.auth.getSession().then(async ({data,error}) => { if (error) { $('authStatus').textContent=error.message; return; } session=data.session; if (session) { showSignedIn(); await loadCloudData(); } }).catch(err => $('authStatus').textContent=err.message);
+  $('signOutBtn').addEventListener('click', async () => { if (db && navigator.onLine) { try { await db.auth.signOut(); } catch (_) {} } session=null; localStorage.removeItem(LOCAL_ACCESS_KEY); $('appRoot').classList.add('hidden'); $('authView').classList.remove('hidden'); $('authStatus').textContent='You have signed out.'; });
+  function allowLocalOfflineAccess() {
+    if (localStorage.getItem(LOCAL_ACCESS_KEY) !== '1') return false;
+    showSignedIn();
+    setSyncStatus(pendingSync ? 'Offline — changes waiting to sync' : 'Offline — showing saved data');
+    return true;
+  }
+  if (!cloudReady) $('authStatus').textContent = 'Set up config.js with your Supabase URL and publishable key to begin.';
+  else if (!navigator.onLine && allowLocalOfflineAccess()) { /* Previously authenticated on this device; show cached data without cloud access. */ }
+  else {
+    let initFinished = false;
+    const fallbackTimer = setTimeout(() => { if (!initFinished && allowLocalOfflineAccess()) setSyncStatus('Offline — showing saved data; cloud connection unavailable'); }, 4000);
+    db.auth.getSession().then(async ({data,error}) => {
+      initFinished = true; clearTimeout(fallbackTimer);
+      if (error) { if (!allowLocalOfflineAccess()) $('authStatus').textContent=error.message; else setSyncStatus('Offline — showing saved data; cloud connection unavailable'); return; }
+      session=data.session; if (session) { localStorage.setItem(LOCAL_ACCESS_KEY, '1'); showSignedIn(); await loadCloudData(); }
+      else if (!allowLocalOfflineAccess()) $('authStatus').textContent='Sign in while online once to enable offline access on this device.';
+    }).catch(err => { initFinished=true; clearTimeout(fallbackTimer); if (!allowLocalOfflineAccess()) $('authStatus').textContent=err.message; else setSyncStatus('Offline — showing saved data; cloud connection unavailable'); });
+  }
   renderHome();
   renderStandaloneTasks();
 })();
