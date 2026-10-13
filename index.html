@@ -303,8 +303,27 @@
     const userId = session.user.id;
     // Explicit user deletions are queued locally and applied to the cloud only when online.
     // Never infer deletions from records missing in this device's local copy.
-    const deletedTaskIds = readTombstones(DELETED_TASKS_KEY);
+    const localDeletedTaskIds = readTombstones(DELETED_TASKS_KEY);
     const localDeletedProjectIds = readTombstones(DELETED_PROJECTS_KEY);
+
+    // Task deletion records are shared across all app origins/devices, just like
+    // project deletion records. This prevents stale standalone-task copies from
+    // being merged back into Supabase by another app instance.
+    const { data: sharedTaskDeletions, error: sharedTaskDeletionReadError } = await db
+      .from('task_deletion_tombstones')
+      .select('task_id')
+      .eq('user_id', userId);
+    if (sharedTaskDeletionReadError) throw new Error('Task deletion protection is not configured. Run the updated SQL in Supabase first. Details: ' + sharedTaskDeletionReadError.message);
+    const sharedDeletedTaskIds = (sharedTaskDeletions || []).map(row => row.task_id);
+
+    // Publish local task deletion records before fetching/uploading task data.
+    if (localDeletedTaskIds.length) {
+      const taskDeletionRows = localDeletedTaskIds.map(taskId => ({ user_id: userId, task_id: taskId }));
+      const { error: publishTaskDeletionError } = await db.from('task_deletion_tombstones')
+        .upsert(taskDeletionRows, { onConflict: 'user_id,task_id', ignoreDuplicates: true });
+      if (publishTaskDeletionError) throw publishTaskDeletionError;
+    }
+    const deletedTaskIds = [...new Set([...localDeletedTaskIds, ...sharedDeletedTaskIds])];
 
     // Project deletion records live in Supabase so every browser origin/device
     // sees them. A stale app must not resurrect a project from its local cache.
@@ -378,9 +397,12 @@
       projects = mergedProjects.map(p=>({...p,tasks:[]})); standaloneTasks=[];
       mergedTasks.forEach(t=>{ const pid=t.projectId || ''; delete t.projectId; if(pid){const p=projects.find(x=>x.id===pid); if(p)p.tasks.push(t);} else standaloneTasks.push(t); });
     }
-    // Final guard: never upload a project (or its tasks) whose ID is tombstoned.
+    // Final guard: never upload a deleted project or task from stale local data.
     const deletedProjectSetForUpload = new Set(deletedProjectIds);
+    const deletedTaskSetForUpload = new Set(deletedTaskIds);
     projects = projects.filter(project => !deletedProjectSetForUpload.has(project.id));
+    projects.forEach(project => { project.tasks = project.tasks.filter(task => !deletedTaskSetForUpload.has(task.id)); });
+    standaloneTasks = standaloneTasks.filter(task => !deletedTaskSetForUpload.has(task.id));
     const {projectRows,taskRows} = cloudRows(userId);
     if (projectRows.length) { const {error}=await db.from('projects').upsert(projectRows,{onConflict:'id'}); if(error) throw error; }
     if (taskRows.length) { const {error}=await db.from('tasks').upsert(taskRows,{onConflict:'id'}); if(error) throw error; }
@@ -400,12 +422,17 @@
         db.from('tasks').select('*').eq('user_id',uid).order('created_at',{ascending:true})
       ]);
       if (pe) throw pe; if (te) throw te;
-      if ((!pr || !pr.length) && (!tr || !tr.length)) {
+      const { data: sharedTaskDeletions, error: sharedTaskDeletionError } = await db
+        .from('task_deletion_tombstones').select('task_id').eq('user_id', uid);
+      if (sharedTaskDeletionError) throw sharedTaskDeletionError;
+      const deletedTaskIds = new Set((sharedTaskDeletions || []).map(row => row.task_id));
+      const filteredTasks = (tr || []).filter(row => !deletedTaskIds.has(row.id));
+      if ((!pr || !pr.length) && (!filteredTasks.length)) {
         if (projects.length || standaloneTasks.length) { pendingSync=true; localStorage.setItem('my-projects-pending-sync','1'); }
       } else if (!pendingSync) {
         projects = (pr || []).map(row => ({id:row.id,name:row.name,notes:row.notes || '',createdAt:row.created_at,tasks:[]}));
         standaloneTasks = [];
-        (tr || []).forEach(row => { const t={id:row.id,text:row.title,done:!!row.completed_at,createdAt:row.created_at,dueDate:row.due_date || '',completedAt:row.completed_at || '',plannedFor:row.planned_for || ''}; if(row.project_id){const p=projects.find(p=>p.id===row.project_id);if(p)p.tasks.push(t);}else standaloneTasks.push(t); });
+        filteredTasks.forEach(row => { const t={id:row.id,text:row.title,done:!!row.completed_at,createdAt:row.created_at,dueDate:row.due_date || '',completedAt:row.completed_at || '',plannedFor:row.planned_for || ''}; if(row.project_id){const p=projects.find(p=>p.id===row.project_id);if(p)p.tasks.push(t);}else standaloneTasks.push(t); });
         localStorage.setItem(STORAGE_KEY,JSON.stringify(projects)); localStorage.setItem(STORAGE_KEY+'-standalone',JSON.stringify(standaloneTasks));
       }
       renderHome(); renderStandaloneTasks();
