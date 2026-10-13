@@ -212,15 +212,10 @@
   const SUPABASE_URL = window.MY_PROJECTS_SUPABASE_URL || '';
   const SUPABASE_KEY = window.MY_PROJECTS_SUPABASE_KEY || '';
   const cloudReady = !!(window.supabase && SUPABASE_URL && SUPABASE_KEY);
-  const db = cloudReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-    auth: {
-      // Persist the signed-in session on this device; never store the user's password.
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      storage: window.localStorage
-    }
-  }) : null;
+  // Use Supabase's default auth storage and session handling. These defaults
+  // already persist sessions in localStorage; explicitly supplying storage here
+  // is unnecessary and can interfere with recovery from an older cached build.
+  const db = cloudReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
   let session = null;
   let syncTimer = null;
   let isLoadingCloud = false;
@@ -292,7 +287,16 @@
     standaloneTasks.forEach(t => taskRows.push({id:t.id, user_id:userId, project_id:null, title:t.text, notes:'', created_at:t.createdAt || new Date().toISOString(), due_date:t.dueDate || null, completed_at:t.done ? (t.completedAt || new Date().toISOString()) : null, planned_for:t.plannedFor || null, sort_order:0}));
     return {projectRows, taskRows};
   }
-  async function syncToCloud() {
+  // Serialize sync attempts. The 20-second poll, focus/pageshow events and a local
+  // delete can otherwise start overlapping syncs; one sync can re-upload a task
+  // while another is processing its deletion tombstone.
+  let syncPromise = null;
+  function syncToCloud() {
+    if (syncPromise) return syncPromise;
+    syncPromise = syncToCloudImpl().finally(() => { syncPromise = null; });
+    return syncPromise;
+  }
+  async function syncToCloudImpl() {
     if (!session || !db) { setSyncStatus(navigator.onLine ? 'Saved on this device' : 'Offline — changes saved on this device'); return; }
     if (!navigator.onLine) { setSyncStatus('Offline — changes saved on this device'); return; }
     setSyncStatus('Syncing…');
@@ -592,7 +596,8 @@
     }
   });
   async function refreshCloudState() {
-    if (!db || !navigator.onLine || !session || isLoadingCloud) return;
+    // Never start a cloud download while another sync is processing queued deletions.
+    if (!db || !navigator.onLine || !session || isLoadingCloud || syncPromise) return;
     try {
       if (pendingSync) await syncToCloud();
       else await loadCloudData();
