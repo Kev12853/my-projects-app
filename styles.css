@@ -57,7 +57,7 @@
     .task-buttons { display:flex; gap:4px; align-items:center; }
     .small-action { border:0; background:#eeeee7; border-radius:9px; padding:7px 9px; color:var(--ink); font-size:.78rem; }
     .small-action.selected { background:var(--green-pale); color:var(--green); font-weight:700; }
-    .sync-status { font-size:4rem; color:var(--muted); text-align:right; margin-top:-12px; margin-bottom:12px; }
+    .sync-status { font-size:.8rem; color:var(--muted); text-align:right; margin-top:-12px; margin-bottom:12px; }
     .task-date-input { width:100%; max-width:170px; padding:7px; border:1px solid var(--line); border-radius:8px; }
     .view-heading { display:flex; align-items:flex-start; gap:10px; margin:10px 0 22px; }
     .back { border:0; border-radius:12px; width:42px; height:42px; background:#eae9e1; font-size:1.3rem; flex-shrink:0; }
