@@ -591,13 +591,28 @@
       projects = projects.filter(x => x.id !== currentId); currentId = null; save(); renderHome(); showView('home'); showToast('Project deleted');
     }
   });
+  async function refreshCloudState() {
+    if (!db || !navigator.onLine || !session || isLoadingCloud) return;
+    try {
+      if (pendingSync) await syncToCloud();
+      else await loadCloudData();
+    } catch (_) {
+      setSyncStatus(navigator.onLine ? 'Sync pending — retrying automatically' : 'Offline — changes saved on this device');
+    }
+  }
   window.addEventListener('online', async () => {
     if (!db) return;
-    try { const result = await db.auth.getSession(); if (result.error) throw result.error; session = result.data.session; if (session) await loadCloudData(); else setSyncStatus('Online — sign in to resume cloud sync'); }
+    setSyncStatus('Connection restored — syncing…');
+    try { const result = await db.auth.getSession(); if (result.error) throw result.error; session = result.data.session; if (session) await refreshCloudState(); else setSyncStatus('Online — sign in to resume cloud sync'); }
     catch (_) { setSyncStatus('Online — reconnecting to cloud…'); }
   });
   window.addEventListener('offline', () => setSyncStatus('Offline — changes saved on this device'));
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && navigator.onLine && session && db && pendingSync) syncToCloud().catch(() => setSyncStatus('Sync pending — retrying when possible')); });
+  // Refresh cloud state automatically so changes made on another device appear without a manual browser refresh.
+  // Poll only while the page is visible and online to avoid unnecessary requests in the background.
+  window.setInterval(() => { if (!document.hidden) refreshCloudState(); }, 20000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshCloudState(); });
+  window.addEventListener('focus', () => refreshCloudState());
+  window.addEventListener('pageshow', () => refreshCloudState());
   window.addEventListener('storage', e => { if (e.key === STORAGE_KEY) { projects = loadProjects(); renderHome(); } });
   $('authForm').addEventListener('submit', e => { e.preventDefault(); handleAuth('signin').catch(err => $('authStatus').textContent = err.message); });
   $('signUpBtn').addEventListener('click', () => handleAuth('signup').catch(err => $('authStatus').textContent = err.message));
